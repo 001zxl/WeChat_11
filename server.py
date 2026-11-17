@@ -428,34 +428,18 @@ def make_handler(state: ConsoleState):
                 self._send(200, handle.read(), content_type)
 
         def _handle_inbound(self, path: str) -> None:
-            from wxreply.channels import contact_key
-            from wxreply.channels.inbound import parse_inbound
+            from wxreply.channels import route_inbound
 
             channel_id = path[len("/api/inbound/"):].strip("/")
-            channel = state.channels.get(channel_id) if state.channels else None
-            if channel is None:
-                self._send(404, b'{"ok":false,"error":"channel not configured"}',
-                           "application/json; charset=utf-8")
-                return
             length = int(self.headers.get("Content-Length") or 0)
             try:
                 payload = json.loads(self.rfile.read(length) or b"{}")
             except Exception:
                 self._send(400, b'{"ok":false,"error":"bad json"}', "application/json; charset=utf-8")
                 return
-            message = parse_inbound(channel.type, payload)
-            if message is None:
-                self._send(200, b'{"ok":true,"skipped":true}', "application/json; charset=utf-8")
-                return
-            memory_peer = contact_key(channel_id, message.peer)
-            result = state.agent.handle_inbound(memory_peer, message.text, auto=True)
-            if result is None:
-                self._send(200, b'{"ok":false,"error":"reply_failed"}', "application/json; charset=utf-8")
-                return
-            sent = channel.send(message.peer, result["reply"])
-            body = json.dumps({"ok": True, "sent": bool(sent), "reply": result["reply"]},
-                              ensure_ascii=False).encode("utf-8")
-            self._send(200, body, "application/json; charset=utf-8")
+            result = route_inbound(state.channels, state.agent, channel_id, payload)
+            self._send(200, json.dumps(result, ensure_ascii=False).encode("utf-8"),
+                       "application/json; charset=utf-8")
 
         def do_POST(self) -> None:
             path = urlparse(self.path).path

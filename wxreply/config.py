@@ -89,6 +89,14 @@ class SafetyConfig:
     require_header_match: bool = True
     verify_send: bool = True
     forbidden_self_disclosure: List[str] = field(default_factory=list)
+    # 发送风控（拟人节奏/频次上限，降低自动化特征）
+    risk_enabled: bool = True
+    risk_min_interval_s: float = 20.0
+    risk_max_per_hour: int = 10
+    risk_max_per_day: int = 50
+    typing_chars_per_second: float = 4.0
+    risk_jitter: float = 0.3
+    risk_max_wait_s: float = 15.0
 
 
 @dataclass

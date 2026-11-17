@@ -43,6 +43,14 @@ safety:
   require_header_match: true
   verify_send: true
   forbidden_self_disclosure: ["作为AI", "作为 AI", "我是一个AI", "语言模型"]
+  # 拟人发送风控：会话冷却 + 小时/日上限 + 输入节奏抖动（降低自动化特征）
+  risk_enabled: true
+  risk_min_interval_s: 20
+  risk_max_per_hour: 10
+  risk_max_per_day: 50
+  typing_chars_per_second: 4.0
+  risk_jitter: 0.3
+  risk_max_wait_s: 15
 
 persona: "personas/sales_zhang.yaml"
 # 好友专属人设（奶龙思路）：按微信显示名覆盖默认语气；"默认" 作为兜底

@@ -854,6 +854,7 @@ $("btnOffscreen").onclick = async () => {
   const result = await act("offscreen");
   if (!result || !result.ok) { alert("离屏切换失败：" + ((result && result.error) || "仅 Windows 支持")); return; }
 };
+
 $("btnSimulate").onclick = openSimulate;
 $("simCancel").onclick = () => $("simulateModal").classList.remove("open");
 $("simSubmit").onclick = submitSimulate;

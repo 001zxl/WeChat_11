@@ -11,6 +11,7 @@ from ..perception.chat import changed_ratio, has_new_outgoing
 from ..perception.layout import Regions
 from ..platform.base import Platform, SendOutcome
 from ..policy import Whitelist, normalize_name
+from .risk import SendRiskController
 
 ABORT_HEADER_MISMATCH = "header_mismatch"
 ABORT_NOT_WHITELIST = "not_whitelisted"
@@ -36,6 +37,7 @@ class SafeSender:
         self.config = config
         self.whitelist = whitelist
         self.ocr = ocr
+        self.risk = SendRiskController(config.safety)
 
     # ---------- 读取当前会话标题 ----------
     def read_header(self, image, regions: Regions) -> str:
@@ -82,6 +84,13 @@ class SafeSender:
             except Exception:
                 original_clipboard = None
 
+        if not runtime.dry_run:
+            wait_s, reason = self.risk.plan(peer, text)
+            if wait_s is None:
+                return SendResult(SendOutcome("aborted", "risk_limit"), header=header)
+            if wait_s > 0:
+                time.sleep(wait_s)
+
         attempts = max(1, int(runtime.send_retries) + 1)
         last = SendResult(SendOutcome("uncertain", "no_attempt"), header=header)
         for attempt in range(attempts):
@@ -124,8 +133,10 @@ class SafeSender:
                 continue
             changed = changed_ratio(pre_image, post_image, regions)
             if has_new_outgoing(post_image, regions) and changed >= 0.002:
+                self.risk.record(peer)
                 return SendResult(SendOutcome("verified", "bubble_confirmed"), header=header, changed=changed)
             if self._confirm_by_readback(text, post_image, regions):
+                self.risk.record(peer)
                 return SendResult(SendOutcome("verified", "readback_confirmed"), header=header, changed=changed)
             last = SendResult(SendOutcome("uncertain", f"attempt={attempt + 1} changed={changed:.4f}"),
                               header=header, changed=changed)

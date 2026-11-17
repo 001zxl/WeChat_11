@@ -313,6 +313,23 @@ class TestDualTrack(unittest.TestCase):
         self.assertEqual(by_text["多少钱"], "in")
 
 
+class TestRisk(unittest.TestCase):
+    def test_risk_limits(self) -> None:
+        from types import SimpleNamespace
+        from wxreply.executor.risk import SendRiskController
+        safety = SimpleNamespace(risk_enabled=True, risk_min_interval_s=0,
+                                 risk_max_per_hour=100, risk_max_per_day=1,
+                                 typing_chars_per_second=1000, risk_jitter=0,
+                                 risk_max_wait_s=0)
+        risk = SendRiskController(safety, now=lambda: 1000.0)
+        wait, _reason = risk.plan("张三", "hi")
+        self.assertEqual(wait, 0.0)
+        risk.record("张三")
+        wait, reason = risk.plan("张三", "hi")
+        self.assertIsNone(wait)
+        self.assertIn("上限", reason)
+
+
 class TestInbound(unittest.TestCase):
     def test_parse_line_and_telegram(self) -> None:
         from wxreply.channels.inbound import parse_inbound
