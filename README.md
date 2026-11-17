@@ -142,6 +142,29 @@ Windows 一键安装：[setup.bat](setup.bat)（装依赖 + RapidOCR + doctor �
   → 审计落库
 ```
 
+
+
+## 电商平台客服接入（与微信同一个控制台）
+
+左侧会话栏顶部可切换「全部 / 微信 / 电商」，电商会话带平台标签（淘宝/京东/拼多多/抖音）。
+
+平台侧把客服消息转发到本服务即可：
+
+```bash
+POST http://127.0.0.1:8765/api/inbound/taobao
+Content-Type: application/json
+
+{
+  "buyer_id": "buyer_001",
+  "order_id": "TB20261117001",
+  "content": "我的折叠桌到哪了？",
+  "shop": "淘宝店"
+}
+```
+
+支持 `taobao` / `jd` / `pdd` / `douyin_shop`；回复会按对应通道的 `endpoint` 回发。
+订单/物流/售后政策通过 `wxreply/brain/ecommerce.py` 注入回复上下文。
+
 ## 安全设计（必须理解）
 
 1. **默认 dry-run**：配置文件 `runtime.dry_run: true`，只生成草稿写审计，不发消息。

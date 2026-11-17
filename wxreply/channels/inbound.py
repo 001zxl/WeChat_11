@@ -5,6 +5,8 @@ from typing import Optional
 
 from .base import IncomingMessage
 
+ECOM_TYPES = ("taobao", "jd", "pdd", "douyin_shop", "ecommerce")
+
 
 def parse_inbound(channel_type: str, payload: dict) -> Optional[IncomingMessage]:
     kind = (channel_type or "").lower()
@@ -34,6 +36,18 @@ def parse_inbound(channel_type: str, payload: dict) -> Optional[IncomingMessage]
         peer = chat.get("id")
         if peer is not None and text:
             return IncomingMessage("telegram", str(peer), text, raw=message)
+        return None
+    if kind in ECOM_TYPES:
+        peer = (payload.get("buyer_id") or payload.get("user_id") or payload.get("buyer")
+                or payload.get("from") or payload.get("peer"))
+        text = str(payload.get("text") or payload.get("content")
+                   or payload.get("message") or "").strip()
+        if peer is not None and text:
+            context = {key: payload.get(key) for key in
+                       ("order_id", "orderId", "item_id", "shop_id", "shop",
+                        "buyer_id", "order_status", "logistics")
+                       if payload.get(key) not in (None, "")}
+            return IncomingMessage(kind, str(peer), text, raw=payload, context=context)
         return None
     text = str(payload.get("text") or payload.get("message") or "").strip()
     peer = payload.get("peer") or payload.get("from") or payload.get("user") or payload.get("chat_id")

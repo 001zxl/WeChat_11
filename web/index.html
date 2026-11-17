@@ -46,6 +46,10 @@
     min-height: 0; height: 100%; overflow: hidden; }
   .card > .title { flex: none; }
   .card .title { font-size: 12px; color: #6b7280; padding: 10px 12px 6px; font-weight: 600; letter-spacing: .02em; }
+  .conv-filter { display: flex; gap: 6px; padding: 4px 8px 8px; }
+  .conv-filter button { border: 1px solid #dfe3e8; background: #fff; color: #667085;
+    border-radius: 6px; padding: 3px 9px; font-size: 11px; cursor: pointer; }
+  .conv-filter button.active { background: #e8f3ff; border-color: #b7d3ff; color: #0958d9; }
   .conv-scroll { flex: 1 1 auto; min-height: 0; display: flex; overflow: hidden; }
   #conversations { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 4px 8px 8px;
     overscroll-behavior: contain; scrollbar-width: none; }
@@ -194,6 +198,11 @@
 <main>
   <section class="card">
     <div class="title">会话</div>
+    <div class="conv-filter" id="convFilter">
+      <button data-ch="all" class="active">全部</button>
+      <button data-ch="wechat">微信</button>
+      <button data-ch="ecommerce">电商</button>
+    </div>
     <div class="conv-scroll">
       <div id="conversations"></div>
       <div class="custom-scroll" id="convScrollbar">
@@ -383,8 +392,11 @@ function renderChips(s) {
 }
 
 let convSignature = "";
+let convFilter = "all";
 function renderConversations(convs, current) {
-  const signature = JSON.stringify(convs.map((c) => [c.peer, c.status, c.unread, c.last_text, c.time, c.avatar])) + "|" + current;
+  if (convFilter === "wechat") convs = convs.filter((c) => (c.channel || "wechat") === "wechat");
+  if (convFilter === "ecommerce") convs = convs.filter((c) => (c.channel || "wechat") !== "wechat");
+  const signature = JSON.stringify(convs.map((c) => [c.peer, c.status, c.unread, c.last_text, c.time, c.avatar, c.channel])) + "|" + current + "|" + convFilter;
   if (signature === convSignature) return;
   convSignature = signature;
   if (!convs.length) {
@@ -402,7 +414,7 @@ function renderConversations(convs, current) {
     return `<div class="conv ${active}" data-peer="${escapeAttr(c.peer)}">
       <div class="avatar">${avatar}</div>
       <div class="meta">
-        <div class="name"><span class="peer-name">${escapeHtml(c.peer)}</span>${c.simulated ? '<span class="badge" style="background:#722ed1">模拟</span>' : ""}${unread}<span class="conv-time">${escapeHtml(c.time || "")}</span></div>
+        <div class="name"><span class="peer-name">${escapeHtml(c.peer)}</span>${c.simulated ? '<span class="badge" style="background:#722ed1">模拟</span>' : ""}${(c.channel && c.channel !== "wechat") ? `<span class="badge" style="background:#0958d9">${{taobao:"淘宝",jd:"京东",pdd:"拼多多",douyin_shop:"抖音",line:"LINE",telegram:"TG",ecommerce:"电商"}[c.channel] || escapeHtml(c.channel)}</span>` : ""}${unread}<span class="conv-time">${escapeHtml(c.time || "")}</span></div>
         <div class="status">${escapeHtml(c.status || "—")} · ${escapeHtml((c.last_text || "").slice(0, 18))}</div>
       </div>
       ${inWhitelist ? "" : `<button class="wl-quick" data-add="${escapeAttr(c.peer)}">+ 白名单</button>`}
@@ -855,6 +867,15 @@ $("btnOffscreen").onclick = async () => {
   if (!result || !result.ok) { alert("离屏切换失败：" + ((result && result.error) || "仅 Windows 支持")); return; }
 };
 
+
+document.querySelectorAll("#convFilter button").forEach((btn) => {
+  btn.onclick = () => {
+    convFilter = btn.dataset.ch || "all";
+    document.querySelectorAll("#convFilter button").forEach((el) => el.classList.toggle("active", el === btn));
+    convSignature = "";
+    renderConversations((state && state.conversations) || [], selected);
+  };
+});
 $("btnSimulate").onclick = openSimulate;
 $("simCancel").onclick = () => $("simulateModal").classList.remove("open");
 $("simSubmit").onclick = submitSimulate;

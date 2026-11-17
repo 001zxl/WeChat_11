@@ -61,3 +61,25 @@ class WebhookChannel(Channel):
     def health(self) -> Dict[str, object]:
         return {"id": self.id, "type": self.type, "ok": bool(self.options.get("endpoint")),
                 "provider": self.provider}
+
+
+class EcommerceChannel(WebhookChannel):
+    """电商平台客服通道：淘宝/京东/拼多多/抖音小店 通用 Webhook。"""
+
+    def __init__(self, channel_id: str, options: Optional[Dict[str, str]] = None,
+                 platform: str = "ecommerce") -> None:
+        super().__init__(channel_id, options)
+        self.platform = platform
+        self.capabilities = ChannelCapabilities(
+            can_send=True, can_read_history=False, has_avatars=False,
+            supports_groups=False, transport="bot-api",
+        )
+
+    @property
+    def type(self) -> str:  # type: ignore[override]
+        return self.platform
+
+    def health(self) -> Dict[str, object]:
+        data = super().health()
+        data.update({"platform": self.platform})
+        return data

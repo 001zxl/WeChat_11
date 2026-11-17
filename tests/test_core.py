@@ -330,6 +330,34 @@ class TestRisk(unittest.TestCase):
         self.assertIn("上限", reason)
 
 
+class TestEcommerce(unittest.TestCase):
+    def test_parse_ecommerce_payload(self) -> None:
+        from wxreply.channels.inbound import parse_inbound
+        payload = {"buyer_id": "buyer_001", "order_id": "TB20261117001",
+                   "content": "我的桌子到哪了？", "shop": "淘宝店"}
+        message = parse_inbound("taobao", payload)
+        self.assertEqual(message.peer, "buyer_001")
+        self.assertEqual(message.context["order_id"], "TB20261117001")
+
+    def test_order_context(self) -> None:
+        from wxreply.brain.ecommerce import EcommerceService
+        service = EcommerceService()
+        text = service.describe("taobao:buyer_001", "订单到哪了", {"order_id": "TB20261117001"})
+        self.assertIn("TB20261117001", text)
+        self.assertIn("顺丰", text)
+        self.assertIn("7 天无理由", text)
+
+    def test_handle_inbound_ecommerce_channel(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = make_config(tmp)
+            from wxreply.agent import Agent
+            agent = Agent(cfg, MockPlatform(), dry_run=True, notify=lambda _msg: None)
+            result = agent.handle_inbound("taobao:buyer_001", "我的订单到哪了",
+                                          context={"order_id": "TB20261117001"})
+            self.assertIsNotNone(result)
+            self.assertEqual(agent._conv["taobao:buyer_001"]["channel"], "taobao")
+
+
 class TestInbound(unittest.TestCase):
     def test_parse_line_and_telegram(self) -> None:
         from wxreply.channels.inbound import parse_inbound

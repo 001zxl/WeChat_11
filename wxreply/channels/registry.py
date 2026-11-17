@@ -4,7 +4,7 @@ from typing import Dict, Iterable, List, Optional
 
 from .base import Channel, ChannelConfig
 from .wechat import WeChatChannel
-from .webhook import WebhookChannel
+from .webhook import EcommerceChannel, WebhookChannel
 
 
 def contact_key(channel_id: str, peer: str) -> str:
@@ -44,4 +44,6 @@ def build_registry(configs: Iterable[ChannelConfig], agent=None) -> ChannelRegis
             registry.register(WeChatChannel(agent, item.id or "wechat"))
         elif item.type in ("line", "telegram", "webhook", "dingtalk"):
             registry.register(WebhookChannel(item.id or item.type, item.options))
+        elif item.type in ("taobao", "jd", "pdd", "douyin_shop", "ecommerce"):
+            registry.register(EcommerceChannel(item.id or item.type, item.options, item.type))
     return registry

@@ -83,6 +83,24 @@ channels:
   #     endpoint: "https://api.line.me/v2/bot/message/push"
   #     token: "LINE_CHANNEL_ACCESS_TOKEN"
   #     provider: "line"
+  # - id: "taobao"
+  #   type: "taobao"
+  #   enabled: false
+  #   options:
+  #     endpoint: "https://<你的淘宝客服网关>/reply"
+  #     provider: "generic"
+  # - id: "jd"
+  #   type: "jd"
+  #   enabled: false
+  #   options: { endpoint: "https://<你的京东客服网关>/reply", provider: "generic" }
+  # - id: "pdd"
+  #   type: "pdd"
+  #   enabled: false
+  #   options: { endpoint: "https://<你的拼多多客服网关>/reply", provider: "generic" }
+  # - id: "douyin_shop"
+  #   type: "douyin_shop"
+  #   enabled: false
+  #   options: { endpoint: "https://<你的抖店客服网关>/reply", provider: "generic" }
   # - id: "telegram"
   #   type: "telegram"
   #   enabled: false

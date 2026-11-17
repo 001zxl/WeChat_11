@@ -12,6 +12,7 @@ from .audit import AuditStore
 from .brain.llm import ModelRouter
 from .brain.memory import MemoryStore
 from .brain.persona import Persona, build_system_prompt, load_persona
+from .brain.ecommerce import EcommerceService
 from .brain.rag import EmbeddingClient, KnowledgeBase
 from .brain.tools import ToolBox
 from .brain.vision import VisionClient
@@ -86,6 +87,7 @@ class Agent:
             config.resolve(config.rag.embedding_cache),
         )
         self.kb = KnowledgeBase(config.resolve(config.kb_dir), config.rag.mode, self.embeddings)
+        self.ecommerce = EcommerceService(config.resolve("data/ecommerce/orders.json"))
         self.router = ModelRouter(config.ai, dry_run=self.dry_run)
         self.router.client.dry_run = not self.router.client.ready
 
@@ -376,10 +378,13 @@ class Agent:
         return processed
 
     # ---------- 会话/历史 ----------
-    def _touch(self, peer: str, status: str = "", unread: Optional[int] = None, text: str = "") -> None:
+    def _touch(self, peer: str, status: str = "", unread: Optional[int] = None,
+               text: str = "", channel: str = "wechat") -> None:
         entry = self._conv.setdefault(
-            peer, {"peer": peer, "unread": 0, "last_ts": 0.0, "last_text": "", "status": ""}
+            peer, {"peer": peer, "unread": 0, "last_ts": 0.0, "last_text": "",
+                   "status": "", "channel": channel}
         )
+        entry.setdefault("channel", channel)
         entry["last_ts"] = time.time()
         if status:
             entry["status"] = status
@@ -488,7 +493,8 @@ class Agent:
             self.emit("tool", name=result.name, summary=result.summary, ok=result.ok,
                       simulated=True)
         reply, model, latency = self._generate(
-            [text], text, history, profile, tool_results, is_group_name(peer), peer=peer
+            [text], text, history, profile, tool_results, is_group_name(peer),
+            peer=peer
         )
         if reply is None:  # 偶发网络/限流，重试一次
             reply, model, latency = self._generate(
@@ -524,12 +530,17 @@ class Agent:
                 "model": model, "latency_ms": latency,
                 "tools": [r.summary for r in tool_results]}
 
-    def handle_inbound(self, peer: str, text: str, auto: bool = True) -> Optional[Dict[str, Any]]:
-        """外部 IM（LINE/Telegram/Webhook）入站：走同一套人设/知识库/工具/护栏。"""
+    def handle_inbound(self, peer: str, text: str, auto: bool = True,
+                       context: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+        """外部 IM / 电商平台入站：走同一套人设/知识库/工具/护栏。"""
         text = (text or "").strip()
         if not text:
             return None
         peer = (peer or "unknown").strip()
+        channel = peer.split(":", 1)[0] if ":" in peer else "wechat"
+        ecom_context = ""
+        if channel in ("taobao", "jd", "pdd", "douyin_shop", "ecommerce"):
+            ecom_context = self.ecommerce.describe(peer, text, context or {})
         history = self.memory.history_lines(peer, self.config.memory.recent_limit)
         profile = self.memory.profile(peer)
         decision = self.guardrails.assess_incoming(text)
@@ -540,17 +551,18 @@ class Agent:
             reply = f"（转人工）{decision.reason}"
             view.append(("out", reply))
             self.memory.add(peer, "out", "text", reply)
-            self._touch(peer, status="转人工", unread=0, text=reply)
+            self._touch(peer, status="转人工", unread=0, text=reply, channel=channel)
             self.emit("inbound", peer=peer, incoming=text, reply=reply, escalated=True)
             return {"peer": peer, "incoming": text, "reply": reply, "escalated": True}
         tool_results = self.tools.prefetch(text)
         reply, model, latency = self._generate(
-            [text], text, history, profile, tool_results, is_group_name(peer), peer=peer
+            [text], text, history, profile, tool_results, is_group_name(peer),
+            peer=peer, context=ecom_context
         )
         if reply is None:
             return None
         self._touch(peer, status="外部消息已回复" if auto else "外部消息草稿",
-                    unread=0, text=reply)
+                    unread=0, text=reply, channel=channel)
         if auto:
             view.append(("out", reply))
             self.memory.add(peer, "out", "text", reply)
@@ -1242,7 +1254,7 @@ class Agent:
 
     def _generate(self, incoming: List[str], joined: str, history: List[str],
                   profile: Dict[str, str], tool_results: List[Any], is_group: bool,
-                  peer: str = "") -> Tuple[Optional[str], str, int]:
+                  peer: str = "", context: str = "") -> Tuple[Optional[str], str, int]:
         chunks = self.kb.search(joined, top_k=self.config.rag.top_k)
         system = build_system_prompt(self.persona, chunks, profile)
         if profile.get("summary"):
@@ -1255,6 +1267,8 @@ class Agent:
         friend_persona = self._friend_persona(peer)
         if friend_persona:
             system += f"\n【该好友专属人设】{friend_persona}"
+        if context:
+            system += f"\n{context}"
         if self._instruction:
             system += f"\n【额外要求】{self._instruction}"
 

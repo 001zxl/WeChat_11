@@ -15,7 +15,8 @@ def route_inbound(registry, agent, channel_id: str, payload: Dict[str, Any]) -> 
     if message is None:
         return {"ok": True, "skipped": True}
     memory_peer = contact_key(channel_id, message.peer)
-    result = agent.handle_inbound(memory_peer, message.text, auto=True)
+    result = agent.handle_inbound(memory_peer, message.text, auto=True,
+                                  context=message.context)
     if result is None:
         return {"ok": False, "error": "reply_failed"}
     sent = channel.send(message.peer, result["reply"])

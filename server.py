@@ -84,6 +84,10 @@ class ConsoleState:
                                      enabled=bool(item.get("enabled", True)),
                                      options={str(k): str(v) for k, v in (item.get("options") or {}).items()})
                        for item in (cfg.channels or [])]
+            if not configs and getattr(platform, "name", "") == "mock":
+                configs = [ChannelConfig(id="wechat", type="wechat"),
+                           ChannelConfig(id="taobao", type="taobao"),
+                           ChannelConfig(id="jd", type="jd")]
             self.channels = build_registry(configs, self.agent) if configs else None
         except Exception:
             self.channels = None
@@ -162,6 +166,7 @@ class ConsoleState:
                                ("&v=" + str(int(os.path.getmtime(avatar_path)*1_000_000)) if avatar_path else ""))
                               if avatar_path else "",
                     "simulated": bool(conv.get("simulated") or conv["peer"].startswith("【模拟】")),
+                    "channel": conv.get("channel", "wechat"),
                 })
             events = list(self.events)[-60:]
             return {
@@ -207,6 +212,10 @@ class ConsoleState:
                 if peer in {conv["peer"] for conv in self.agent.conversations()}:
                     self.selected = peer
                     self.agent.mark_read(peer)
+                    channel = peer.split(":", 1)[0] if ":" in peer else "wechat"
+                    if peer.startswith("【模拟】") or channel != "wechat":
+                        # 电商/外部通道/模拟会话：历史就在本地，不需要抓微信
+                        return {"ok": True}
                     self.agent._view_history[peer] = [("sys", "正在读取聊天记录…")]
 
                     def read_passive() -> None:

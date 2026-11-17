@@ -6,7 +6,7 @@ LINE/Telegram/DingTalk 等走 Webhook/HTTP Bot API，共用同一套记忆与人
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 
 @dataclass
@@ -15,6 +15,7 @@ class IncomingMessage:
     peer: str
     text: str
     raw: Optional[dict] = None
+    context: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
